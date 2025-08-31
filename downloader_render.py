@@ -6,27 +6,31 @@ import zipfile
 import json
 import io
 import requests
+import ffmpeg
 
 TEMP_DIR="/tmp" #umjesto output_patha na Renderu
 
-def youtube_to_m4a_ffmpeg(url, output_path='.'):
-    try:
-        print(f"\n📁 Trenutni radni direktorij: {os.getcwd()}")
-        yt = YouTube(url, use_oauth=False, allow_oauth_cache=True,use_po_token=None)
-        audio_stream = yt.streams.filter(only_audio=True).first()
-        print(f"🎬 Video: {yt.title}")
 
-        # Preuzmi audio kao .mp4 / .m4a
-        downloaded_file = audio_stream.download(output_path=output_path)
-        print(f"⬇️  Skinuti fajl: {downloaded_file}")
-        print(f"📦 Fajl postoji? {'Da' if os.path.exists(downloaded_file) else 'Ne'}")
-        print("✅ Stvoren je konacni m4a file")
-        print(os.path.abspath(downloaded_file))
-        return os.path.abspath(downloaded_file)
-
-        
-    except Exception as e:
-        print("❗ Došlo je do greške:", e)
+def youtube_to_m4a_yt_dlp(url, output_path=TEMP_DIR):
+    output_template = os.path.join(output_path, "%(title)s.%(ext)s")
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': output_template,
+        'quiet': True,
+        'no_warnings': True,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'm4a',
+            'preferredquality': '192',
+        }],
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        audio_file = ydl.prepare_filename(info)
+        # promijeni ekstenziju u m4a ako je ffmpeg postprocesirao
+        if not audio_file.endswith(".m4a"):
+            audio_file = os.path.splitext(audio_file)[0] + ".m4a"
+        return audio_file
 
 
 def search_youtube(query, max_results=1): # EXTRACT VIDEO FROM TEXT
@@ -64,49 +68,47 @@ def get_thumbnail_url(youtube_url: str) -> str:
     return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg" 
     #return f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
     #taj drugi uvijek postoji
-def main_function(query,output_path='.'):
+
+def main_function(query, output_path=TEMP_DIR):
     mem = io.BytesIO()
-    
-    results = search_youtube(query)
-    
-    print("\nRezultati:")
-    for i, video in enumerate(results, start=1):
-        title = video.get('title', 'Untitled')
-        author = video.get('uploader', 'Unknown')
-        url = video.get('url', 'N/A')
-        thumbnail=get_thumbnail_url(url)
-        print(f"{i}. {title}")
-        print(f"   Artist: {author}\n")
-        print(f"   URL: {url}\n")
-        print(f"   Thumbnail: {get_thumbnail_url(url)}\n")
 
-    resp = requests.get(get_thumbnail_url(url))
+    # Pretraži YouTube koristeći yt-dlp
+    search_query = f"ytsearch1:{query}"
+    ydl_opts = {'quiet': True, 'skip_download': True, 'extract_flat': True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        results = ydl.extract_info(search_query, download=False).get('entries', [])
+
+    if not results:
+        raise Exception("Nema rezultata za upit!")
+
+    video = results[0]
+    title = video.get('title', 'Untitled')
+    author = video.get('uploader', 'Unknown')
+    url = video.get('url', 'N/A')
+
+    # Preuzmi audio
+    audio_file = youtube_to_m4a_yt_dlp(url, output_path)
+
+    # Preuzmi thumbnail
+    thumbnail_url = f"https://img.youtube.com/vi/{video['id']}/maxresdefault.jpg"
+    resp = requests.get(thumbnail_url)
     thumbnail_bytes = resp.content
-    
-    with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        # Dodaj m4a fajl
-        with open(youtube_to_m4a_ffmpeg(url, output_path), "rb") as f:
-            data = f.read()
-        zf.writestr("song.m4a", data)
-        
-        # Dodaj thumbnail
-        zf.writestr("thumbnail.jpg", thumbnail_bytes)
-        
-        # Dodaj metapodatke u JSON formatu
-        metadata = {
-            "title": title,
-            "author": author
-        }
-        zf.writestr("info.json", json.dumps(metadata, ensure_ascii=False))
-    
-    mem.seek(0)
-    print("ended zip")
 
-    zip_path = os.path.abspath(os.path.join(output_path, "output.zip"))
+    # Kreiraj zip
+    with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        with open(audio_file, "rb") as f:
+            zf.writestr("song.m4a", f.read())
+        zf.writestr("thumbnail.jpg", thumbnail_bytes)
+        metadata = {"title": title, "author": author}
+        zf.writestr("info.json", json.dumps(metadata, ensure_ascii=False))
+
+    mem.seek(0)
+    zip_path = os.path.join(output_path, "output.zip")
     with open(zip_path, "wb") as f:
         f.write(mem.getbuffer())
 
-    print(zip_path)
-
-    return zip_path   # vraća path do fajla
+    # Očisti privremeni audio fajl
+    if os.path.exists(audio_file):
+        os.remove(audio_file)
+    return zip_path
 
