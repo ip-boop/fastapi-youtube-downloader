@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 ffmpeg
-=======
-ffmpeg
->>>>>>> 402c0f9e56418dbcd600d9d6921f42986a4e939f
