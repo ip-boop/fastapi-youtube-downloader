@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import os
 import time
-from downloader import main_function  # tvoja funkcija koja generira zip
+from downloader_render import main_function  # tvoja funkcija koja generira zip
 
 app = FastAPI()
 
