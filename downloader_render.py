@@ -81,14 +81,9 @@ def main_function(query, output_path=TEMP_DIR):
             # Dodaj metapodatke
             metadata = {"title": title, "author": author}
             zf.writestr("info.json", json.dumps(metadata, ensure_ascii=False))
-    finally:
-        # obriši privremeni audio fajl
-        try:
-            if os.path.exists(audio_file):
-                os.remove(audio_file)
-                print(f"🗑️ Obrisan temp fajl: {audio_file}")
-        except Exception as e:
-            print(f"⚠️ Greška pri brisanju fajla: {e}")
+    except Exception as e:
+        print("❗ Došlo je do greške:", e)
+        raise
 
     mem.seek(0)
 
