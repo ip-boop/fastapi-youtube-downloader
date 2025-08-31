@@ -1,29 +1,36 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
+import shutil
+import tempfile
 import os
 import time
-from downloader_render import main_function  # tvoja funkcija koja generira zip
+from downloader import main_function  # tvoja funkcija koja generira zip
 
 app = FastAPI()
-OUTPUT_FOLDER = "outputs"
 
-if not os.path.exists(OUTPUT_FOLDER):
-    os.makedirs(OUTPUT_FOLDER)
-
+def cleanup_temp_dir(path: str):
+    try:
+        if os.path.exists(path):
+            shutil.rmtree(path)
+            print(f"🗑️ Obrisan temp direktorij: {path}")
+    except Exception as e:
+        print(f"⚠️ Greška pri brisanju {path}: {e}")
 
 @app.get("/generate")
-async def generate(text: str = Query(..., description="Tekst za generiranje zipa")):
+async def generate(background_tasks: BackgroundTasks,text: str = Query(..., description="Tekst za generiranje zipa")):
     if not text:
         raise HTTPException(status_code=400, detail="No text provided")
 
     try:
+        temp_dir = tempfile.mkdtemp(prefix="output_")
         # unikatno ime fajla
         timestamp = int(time.time())
         zip_filename = f"output_{timestamp}.zip"
-        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+        zip_path = os.path.join(temp_dir, zip_filename)
 
         # main_function neka snimi zip na disk i vrati path
-        generated_path = main_function(text, output_path=zip_path)
+        generated_path = main_function(text, output_path=temp_dir)
+        #DOSAD output_path=zip_path
 
         # funkcija za streamanje fajla
         def file_iterator(path, chunk_size=8192):
