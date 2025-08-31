@@ -12,7 +12,7 @@ TEMP_DIR="/tmp" #umjesto output_patha na Renderu
 def youtube_to_m4a_ffmpeg(url, output_path='.'):
     try:
         print(f"\n📁 Trenutni radni direktorij: {os.getcwd()}")
-        yt = YouTube(url,use_po_token=True)
+        yt = YouTube(url, use_oauth=False, allow_oauth_cache=True)
         audio_stream = yt.streams.filter(only_audio=True).first()
         print(f"🎬 Video: {yt.title}")
 
