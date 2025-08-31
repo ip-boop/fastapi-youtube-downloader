@@ -8,13 +8,13 @@ from downloader_render import main_function  # tvoja funkcija koja generira zip
 
 app = FastAPI()
 
-def cleanup_temp_dir(path: str):
-    try:
-        if os.path.exists(path):
-            shutil.rmtree(path)
-            print(f"🗑️ Obrisan temp direktorij: {path}")
-    except Exception as e:
-        print(f"⚠️ Greška pri brisanju {path}: {e}")
+#def cleanup_temp_dir(path: str):
+#    try:
+#        if os.path.exists(path):
+#            shutil.rmtree(path)
+#            print(f"🗑️ Obrisan temp direktorij: {path}")
+#    except Exception as e:
+#        print(f"⚠️ Greška pri brisanju {path}: {e}")
 
 @app.get("/generate")
 async def generate(background_tasks: BackgroundTasks,text: str = Query(..., description="Tekst za generiranje zipa")):
@@ -44,7 +44,7 @@ async def generate(background_tasks: BackgroundTasks,text: str = Query(..., desc
       #              print(f"🗑️ Obrisan fajl: {path}")
       #      except Exception as e:
       #          print(f"⚠️ Greška pri brisanju fajla: {e}")
-
+        print("prc")
         return StreamingResponse(
             file_iterator(generated_path),
             media_type="application/zip",
